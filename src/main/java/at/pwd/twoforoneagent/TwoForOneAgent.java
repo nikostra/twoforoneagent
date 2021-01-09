@@ -13,7 +13,7 @@ import java.util.Random;
 
 public class TwoForOneAgent implements MancalaAgent {
 
-    private Random r = new Random();
+    private final Random r = new Random();
     private MancalaState originalState;
     private static final double C = 1.0f/Math.sqrt(2.0f);
 
@@ -43,7 +43,7 @@ public class TwoForOneAgent implements MancalaAgent {
             for (MCTSTree m : children) {
                 double wC = (double)m.winCount;
                 double vC = (double)m.visitCount;
-                double currentValue =  wC/vC + C*Math.sqrt(2*Math.log(visitCount) / vC);
+                double currentValue =  wC/vC + C*Math.sqrt(2*Math.log(visitCount) / vC);// double currentValue =  wC/vC + Math.sqrt(Math.log(visitCount) / vC)
 
 
                 if (best == null || currentValue > value) {
@@ -146,3 +146,8 @@ public class TwoForOneAgent implements MancalaAgent {
         return "Monte Carlo Tree Search";
     }
 }
+
+// Heuristik für pruning: hab i ma dacht: anzahl der steine in einem depot + expected value(anzahl der steine in einem loch)
+// wobei expected value(anzahl der steine in einem loch) berechnet sich so: wenn man dieses loch auswählt, und ein stein auf meiner seite landet: +1 wenn er auf der gegnerischen Seite landet -1, wenn er in meinem depot landet +1,1 oder so
+// und dann muss ma für den expected value noch schauen in welchem loch die steine sind, weil die hinteren löcher sind gefährlicher als die vorderen wenns ums schlagen geht also hab i ma gedacht *(0.95^(6-lochnummer))
+// und dann gibts no an bonus für freie löcher vor allem welche die weiter vorne sind also da vielleicht 1-(0,5^(lochnummer-1))
