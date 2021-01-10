@@ -21,6 +21,8 @@ public class TwoForOneAgent implements MancalaAgent {
 
     private Random r = new Random();
     private MancalaState originalState;
+
+    //parameters
     private static final double C = 1.0f/Math.sqrt(2.0f);
     private static final double H11 = 0.25;
     private static final double H12 = 0.1;
@@ -52,41 +54,30 @@ public class TwoForOneAgent implements MancalaAgent {
                 double wC = (double)m.winCount;
                 double vC = (double)m.visitCount;
                 double currentValue;
+                double addedValue = 0;
+
+                int action = Integer.parseInt(m.action);
+                int stones = game.getState().stonesIn(m.action);
+
 
                 if(terminal){
-                    double addedValue = 0;
-
-                    int action = Integer.parseInt(m.action);
-                    int stones = game.getState().stonesIn(m.action);
                     System.out.println("stones: " + stones + ", action: " + action);
 
                     if(action < 8 && (stones == (action-1))){
                         addedValue = H11;
-                        //System.out.println("Trigger");
                     } else if(action > 8 && ((action - 8) == stones)){
                         addedValue = H11;
-                        //System.out.println("Trigger");
                     }
-
                     currentValue = wC / vC + addedValue;
-                    System.out.println(currentValue);
+                    System.out.println("score: " + currentValue);
+
                 } else {
-                    double addedValue = 0;
-                    int action = Integer.parseInt(m.action);
-                    int stones = game.getState().stonesIn(m.action);
-                    /*System.out.println("slots: " + game.getSelectableSlots());
-                    System.out.println("stones: " + stones + ", action: " + action);
-                    System.out.println("player: " + game.getState().getCurrentPlayer());*/
                     if(action < 8 && (stones == (action-1))){
                         addedValue = H12;
-                        //System.out.println("Trigger, stones: " + stones + ", action: " + action);
                     } else if(action > 8 && ((action - 8) == stones)){
                         addedValue = H12;
-                        //System.out.println("Trigger, stones: " + stones + ", action: " + action);
                     }
-
                     currentValue = wC / vC + C * Math.sqrt(2 * Math.log(visitCount) / vC) + addedValue;
-                    //System.out.println("points: " + currentValue);
                 }
 
                 if (best == null || currentValue > value) {
@@ -107,7 +98,6 @@ public class TwoForOneAgent implements MancalaAgent {
             if (!newGame.selectSlot(action)) {
                 newGame.nextPlayer();
             }
-
             MCTSTree tree = new MCTSTree(newGame);
             tree.action = action;
             tree.parent = this;
