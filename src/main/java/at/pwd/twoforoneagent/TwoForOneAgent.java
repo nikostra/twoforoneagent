@@ -11,11 +11,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * Changes:
+ * UCT algorithm only used for choosing child node, not for choosing final move.
+ * Heuristic 1: (Parameter: H11 + H12): preferring moves that end in the players depot, thus granting another move.
+ *      H11 is for final move decision making, H12 is for the selection step
+ */
 public class TwoForOneAgent implements MancalaAgent {
 
     private Random r = new Random();
     private MancalaState originalState;
     private static final double C = 1.0f/Math.sqrt(2.0f);
+    private static final double H11 = 0.5;
+    private static final double H12 = 0.25;
+
 
     private class MCTSTree {
         private int visitCount;
@@ -37,14 +46,49 @@ public class TwoForOneAgent implements MancalaAgent {
             return winState.getState() == WinState.States.NOBODY;
         }
 
-        MCTSTree getBestNode() {
+        MCTSTree getBestNode(boolean terminal) {
             MCTSTree best = null;
             double value = 0;
             for (MCTSTree m : children) {
                 double wC = (double)m.winCount;
                 double vC = (double)m.visitCount;
-                double currentValue =  wC/vC + C*Math.sqrt(2*Math.log(visitCount) / vC);
+                double currentValue;
 
+                if(terminal){
+                    double addedValue = 0;
+
+                    int action = Integer.parseInt(m.action);
+                    int stones = game.getState().stonesIn(m.action);
+                    //System.out.println("stones: " + stones + ", action: " + action);
+
+                    if(action < 8 && (stones == (action-1))){
+                        addedValue = H11;
+                        //System.out.println("Trigger");
+                    } else if(action > 8 && ((action - 8) == stones)){
+                        addedValue = H11;
+                        //System.out.println("Trigger");
+                    }
+
+                    currentValue = wC / vC + addedValue;
+                    //System.out.println(currentValue);
+                } else {
+                    double addedValue = 0;
+                    int action = Integer.parseInt(m.action);
+                    int stones = game.getState().stonesIn(m.action);
+                    /*System.out.println("slots: " + game.getSelectableSlots());
+                    System.out.println("stones: " + stones + ", action: " + action);
+                    System.out.println("player: " + game.getState().getCurrentPlayer());*/
+                    if(action < 8 && (stones == (action-1))){
+                        addedValue = H12;
+                        //System.out.println("Trigger, stones: " + stones + ", action: " + action);
+                    } else if(action > 8 && ((action - 8) == stones)){
+                        addedValue = H12;
+                        //System.out.println("Trigger, stones: " + stones + ", action: " + action);
+                    }
+
+                    currentValue = wC / vC + C * Math.sqrt(2 * Math.log(visitCount) / vC) + addedValue;
+                    //System.out.println("points: " + currentValue);
+                }
 
                 if (best == null || currentValue > value) {
                     value = currentValue;
@@ -88,8 +132,9 @@ public class TwoForOneAgent implements MancalaAgent {
             backup(best, winning);
         }
 
-        MCTSTree selected = root.getBestNode();
-        System.out.println("Selected action " + selected.winCount + " / " + selected.visitCount);
+        MCTSTree selected = root.getBestNode(true);
+        System.out.println("Selected action: " + selected.action + ", win count: " + selected.winCount +
+                ", visit count: " + selected.visitCount);
         return new MancalaAgentAction(selected.action);
     }
 
@@ -97,10 +142,7 @@ public class TwoForOneAgent implements MancalaAgent {
         boolean hasWon = winState.getState() == WinState.States.SOMEONE && winState.getPlayerId() == originalState.getCurrentPlayer();
 
         while (current != null) {
-            // always increase visit count
             current.visitCount++;
-
-            // if it ended in a win => increase the win count
             current.winCount += hasWon ? 1 : 0;
 
             current = current.parent;
@@ -112,7 +154,7 @@ public class TwoForOneAgent implements MancalaAgent {
             if (!current.isFullyExpanded()) {
                 return expand(current);
             } else {
-                current = current.getBestNode();
+                current = current.getBestNode(false);
             }
         }
         return current;
@@ -120,6 +162,7 @@ public class TwoForOneAgent implements MancalaAgent {
 
     private MCTSTree expand(MCTSTree best) {
         List<String> legalMoves = best.game.getSelectableSlots();
+
         return best.move(legalMoves.get(r.nextInt(legalMoves.size())));
     }
 
@@ -143,6 +186,6 @@ public class TwoForOneAgent implements MancalaAgent {
 
     @Override
     public String toString() {
-        return "Monte Carlo Tree Search";
+        return "Two For One Agent";
     }
 }
