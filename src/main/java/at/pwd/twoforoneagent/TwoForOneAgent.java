@@ -22,9 +22,8 @@ public class TwoForOneAgent implements MancalaAgent {
     private Random r = new Random();
     private MancalaState originalState;
     private static final double C = 1.0f/Math.sqrt(2.0f);
-    private static final double H11 = 0.5;
-    private static final double H12 = 0.25;
-
+    private static final double H11 = 0.25;
+    private static final double H12 = 0.1;
 
     private class MCTSTree {
         private int visitCount;
@@ -59,7 +58,7 @@ public class TwoForOneAgent implements MancalaAgent {
 
                     int action = Integer.parseInt(m.action);
                     int stones = game.getState().stonesIn(m.action);
-                    //System.out.println("stones: " + stones + ", action: " + action);
+                    System.out.println("stones: " + stones + ", action: " + action);
 
                     if(action < 8 && (stones == (action-1))){
                         addedValue = H11;
@@ -70,7 +69,7 @@ public class TwoForOneAgent implements MancalaAgent {
                     }
 
                     currentValue = wC / vC + addedValue;
-                    //System.out.println(currentValue);
+                    System.out.println(currentValue);
                 } else {
                     double addedValue = 0;
                     int action = Integer.parseInt(m.action);
@@ -160,10 +159,14 @@ public class TwoForOneAgent implements MancalaAgent {
         return current;
     }
 
-    private MCTSTree expand(MCTSTree best) {
-        List<String> legalMoves = best.game.getSelectableSlots();
-
-        return best.move(legalMoves.get(r.nextInt(legalMoves.size())));
+    private MCTSTree expand(MCTSTree tree) {
+        List<String> legalMoves = tree.game.getSelectableSlots();
+        if(tree.children != null) {
+            for (MCTSTree m : tree.children){
+                legalMoves.remove(m.action);
+            }
+        }
+        return tree.move(legalMoves.get(r.nextInt(legalMoves.size())));
     }
 
     private WinState defaultPolicy(MancalaGame game) {
@@ -174,6 +177,7 @@ public class TwoForOneAgent implements MancalaAgent {
             String play;
             do {
                 List<String> legalMoves = game.getSelectableSlots();
+
                 play = legalMoves.get(r.nextInt(legalMoves.size()));
             } while(game.selectSlot(play));
             game.nextPlayer();
