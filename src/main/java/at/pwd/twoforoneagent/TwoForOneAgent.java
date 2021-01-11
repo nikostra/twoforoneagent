@@ -24,8 +24,8 @@ public class TwoForOneAgent implements MancalaAgent {
 
     //parameters
     private static final double C = 1.0f/Math.sqrt(2.0f);
-    private static final double H11 = 0.25;
-    private static final double H12 = 0.1;
+    private static final double H11 = 0.25; // die Werte find ich cool, aber ich glaub sie sollen ziemlich klein sein, vielleicht 0.0625 oder 0.125 und
+    private static final double H12 = 0.1; // gegen Ende der Berechnungszeit sollen die 2 Werte auf jeden Fall gleich sein,
 
     private class MCTSTree {
         private int visitCount;
@@ -164,11 +164,80 @@ public class TwoForOneAgent implements MancalaAgent {
         WinState state = game.checkIfPlayerWins();
 
         while(state.getState() == WinState.States.NOBODY) {
-            String play;
+            String play = null;
+            int offsetForEnemySlot = 0;
             do {
                 List<String> legalMoves = game.getSelectableSlots();
-
-                play = legalMoves.get(r.nextInt(legalMoves.size()));
+                // anfang heuristik block /
+                int listindex = 0;
+                int[] stonesIn = new int[6];
+                for (int i = 0; i < 6; i++) {
+                    if(Integer.parseInt(legalMoves.get(listindex)) == i + 2){
+                        stonesIn[i] = game.getState().stonesIn(legalMoves.get(listindex));
+                        listindex++;
+                        offsetForEnemySlot = 7;
+                    }
+                    if(Integer.parseInt(legalMoves.get(listindex)) == i + 9){
+                        stonesIn[i] = game.getState().stonesIn(legalMoves.get(listindex));
+                        listindex++;
+                        offsetForEnemySlot = -7;
+                    }
+                }
+                double[] valueOfMove = new double[6]; // mein gedanke hier ist: wenn man nochmal ziehen darf: +0,5 und wenn man einen stein um ein feld näher zum mancala bewegt +0.125
+                for (int i = 0; i < valueOfMove.length; i++) {
+                    while(stonesIn[i] > 0){
+                        if(stonesIn[i] == i + 1){
+                            valueOfMove[i] += stonesIn[i]*0.125+0.5;
+                            break;
+                        }
+                        if(stonesIn[i] < i + 1){
+                            valueOfMove[i] += stonesIn[i]*0.125;
+                            if(stonesIn[i - stonesIn[i]] == 0){
+                                valueOfMove[i] += stonesIn[i+offsetForEnemySlot]*2 + (i+1)*0.125;
+                            }
+                            break;
+                        }
+                        if(stonesIn[i] > i + 1){
+                            if(stonesIn[i] > i + 12){
+                                valueOfMove[i] -= 12*(1-i*0.125);
+                                valueOfMove[i]++;
+                                stonesIn[i] -= 12;
+                            } else {
+                                valueOfMove[i] += (i+1)*0.125 - ((i+1) - stonesIn[i])*0.75; // hier könnte man noch elaborieren
+                                break;
+                            }
+                        }
+                    }
+                }
+                double min = 1024;
+                for (double item:valueOfMove) {
+                    if(item < min && item != 0){
+                        min = item;
+                    }
+                }
+                for (int i = 0; i < valueOfMove.length; i++) {
+                    if(valueOfMove[i] != 0){
+                        valueOfMove[i] += min + 0.25; // es gibt eine chance, dass schlechte züge gespielt werden, aber nur ein sehr geringe.
+                    }
+                }
+                double sum = 0;
+                for (double item:valueOfMove) {
+                    sum+= item;
+                }
+                double randomValue = (r.nextDouble()*sum);
+                for (int i = 0; i < valueOfMove.length; i++) {
+                    sum -= valueOfMove[i];
+                    if(randomValue > sum){
+                        play = legalMoves.get(i);
+                        break;
+                    }
+                }
+                if(play == null){
+                    System.out.println("error in heuristic calculation logic");
+                    play = legalMoves.get(r.nextInt(legalMoves.size()));
+                }
+                // ende heuristikblock /
+                // play = legalMoves.get(r.nextInt(legalMoves.size()));
             } while(game.selectSlot(play));
             game.nextPlayer();
 
