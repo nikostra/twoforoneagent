@@ -11,11 +11,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * Changes:
+ * UCT algorithm only used for choosing child node, not for choosing final move.
+ * Heuristic 1: (Parameter: H11 + H12): preferring moves that end in the players depot, thus granting another move.
+ *      H11 is for final move decision making, H12 is for the selection step
+ */
 public class TwoForOneAgent implements MancalaAgent {
 
-    private final Random r = new Random();
+    private Random r = new Random();
     private MancalaState originalState;
+
+    //parameters
     private static final double C = 1.0f/Math.sqrt(2.0f);
+    private static final double H11 = 0.25;
+    private static final double H12 = 0.1;
 
     private class MCTSTree {
         private int visitCount;
@@ -37,14 +47,38 @@ public class TwoForOneAgent implements MancalaAgent {
             return winState.getState() == WinState.States.NOBODY;
         }
 
-        MCTSTree getBestNode() {
+        MCTSTree getBestNode(boolean terminal) {
             MCTSTree best = null;
             double value = 0;
             for (MCTSTree m : children) {
                 double wC = (double)m.winCount;
                 double vC = (double)m.visitCount;
-                double currentValue =  wC/vC + C*Math.sqrt(2*Math.log(visitCount) / vC);// double currentValue =  wC/vC + Math.sqrt(Math.log(visitCount) / vC)
+                double currentValue;
+                double addedValue = 0;
 
+                int action = Integer.parseInt(m.action);
+                int stones = game.getState().stonesIn(m.action);
+
+
+                if(terminal){
+                    System.out.println("stones: " + stones + ", action: " + action);
+
+                    if(action < 8 && (stones == (action-1))){
+                        addedValue = H11;
+                    } else if(action > 8 && ((action - 8) == stones)){
+                        addedValue = H11;
+                    }
+                    currentValue = wC / vC + addedValue;
+                    System.out.println("score: " + currentValue);
+
+                } else {
+                    if(action < 8 && (stones == (action-1))){
+                        addedValue = H12;
+                    } else if(action > 8 && ((action - 8) == stones)){
+                        addedValue = H12;
+                    }
+                    currentValue = wC / vC + C * Math.sqrt(2 * Math.log(visitCount) / vC) + addedValue;
+                }
 
                 if (best == null || currentValue > value) {
                     value = currentValue;
@@ -64,7 +98,6 @@ public class TwoForOneAgent implements MancalaAgent {
             if (!newGame.selectSlot(action)) {
                 newGame.nextPlayer();
             }
-
             MCTSTree tree = new MCTSTree(newGame);
             tree.action = action;
             tree.parent = this;
@@ -88,8 +121,9 @@ public class TwoForOneAgent implements MancalaAgent {
             backup(best, winning);
         }
 
-        MCTSTree selected = root.getBestNode();
-        System.out.println("Selected action " + selected.winCount + " / " + selected.visitCount);
+        MCTSTree selected = root.getBestNode(true);
+        System.out.println("Selected action: " + selected.action + ", win count: " + selected.winCount +
+                ", visit count: " + selected.visitCount);
         return new MancalaAgentAction(selected.action);
     }
 
@@ -97,10 +131,7 @@ public class TwoForOneAgent implements MancalaAgent {
         boolean hasWon = winState.getState() == WinState.States.SOMEONE && winState.getPlayerId() == originalState.getCurrentPlayer();
 
         while (current != null) {
-            // always increase visit count
             current.visitCount++;
-
-            // if it ended in a win => increase the win count
             current.winCount += hasWon ? 1 : 0;
 
             current = current.parent;
@@ -112,15 +143,20 @@ public class TwoForOneAgent implements MancalaAgent {
             if (!current.isFullyExpanded()) {
                 return expand(current);
             } else {
-                current = current.getBestNode();
+                current = current.getBestNode(false);
             }
         }
         return current;
     }
 
-    private MCTSTree expand(MCTSTree best) {
-        List<String> legalMoves = best.game.getSelectableSlots();
-        return best.move(legalMoves.get(r.nextInt(legalMoves.size())));
+    private MCTSTree expand(MCTSTree tree) {
+        List<String> legalMoves = tree.game.getSelectableSlots();
+        if(tree.children != null) {
+            for (MCTSTree m : tree.children){
+                legalMoves.remove(m.action);
+            }
+        }
+        return tree.move(legalMoves.get(r.nextInt(legalMoves.size())));
     }
 
     private WinState defaultPolicy(MancalaGame game) {
@@ -131,6 +167,7 @@ public class TwoForOneAgent implements MancalaAgent {
             String play;
             do {
                 List<String> legalMoves = game.getSelectableSlots();
+
                 play = legalMoves.get(r.nextInt(legalMoves.size()));
             } while(game.selectSlot(play));
             game.nextPlayer();
@@ -143,11 +180,6 @@ public class TwoForOneAgent implements MancalaAgent {
 
     @Override
     public String toString() {
-        return "Monte Carlo Tree Search";
+        return "Two For One Agent";
     }
 }
-
-// Heuristik für pruning: hab i ma dacht: anzahl der steine in einem depot + expected value(anzahl der steine in einem loch)
-// wobei expected value(anzahl der steine in einem loch) berechnet sich so: wenn man dieses loch auswählt, und ein stein auf meiner seite landet: +1 wenn er auf der gegnerischen Seite landet -1, wenn er in meinem depot landet +1,1 oder so
-// und dann muss ma für den expected value noch schauen in welchem loch die steine sind, weil die hinteren löcher sind gefährlicher als die vorderen wenns ums schlagen geht also hab i ma gedacht *(0.95^(6-lochnummer))
-// und dann gibts no an bonus für freie löcher vor allem welche die weiter vorne sind also da vielleicht 1-(0,5^(lochnummer-1))
