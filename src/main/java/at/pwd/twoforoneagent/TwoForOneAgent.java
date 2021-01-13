@@ -16,6 +16,7 @@ import java.util.Random;
  * UCT algorithm only used for choosing child node, not for choosing final move.
  * Heuristic 1: (Parameter: H11 + H12): preferring moves that end in the players depot, thus granting another move.
  *      H11 is for final move decision making, H12 is for the selection step
+ * Changed selection to always include all child nodes
  */
 public class TwoForOneAgent implements MancalaAgent {
 
@@ -55,10 +56,8 @@ public class TwoForOneAgent implements MancalaAgent {
                 double vC = (double)m.visitCount;
                 double currentValue;
                 double addedValue = 0;
-
                 int action = Integer.parseInt(m.action);
                 int stones = game.getState().stonesIn(m.action);
-
 
                 if(terminal){
                     System.out.println("stones: " + stones + ", action: " + action);
