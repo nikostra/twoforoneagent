@@ -8,6 +8,7 @@ import at.pwd.boardgame.game.mancala.agent.MancalaAgent;
 import at.pwd.boardgame.game.mancala.agent.MancalaAgentAction;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -26,6 +27,10 @@ public class TwoForOneAgent implements MancalaAgent {
     private static final double C = 1.0f/Math.sqrt(2.0f);
     private static final double H11 = 0.25; // die Werte find ich cool, aber ich glaub sie sollen ziemlich klein sein, vielleicht 0.0625 oder 0.125 und
     private static final double H12 = 0.1; // gegen Ende der Berechnungszeit sollen die 2 Werte auf jeden Fall gleich sein,
+    private static final double H21 = 0.125; // Wie viel mehr wert sind sie Steine wenn sie 1 Feld weiter vorne sind.
+    private static final double H22 = 0.5; // Wie gut ist es nochmal dranzukommen.
+    private static final double H23 = 0.25; // Welchen Wert soll der schlechteste Zug haben.
+    private static final int ENDG_DATA_LEN = 14; // länge der endspieldatenbank
 
     private class MCTSTree {
         private int visitCount;
@@ -164,11 +169,27 @@ public class TwoForOneAgent implements MancalaAgent {
         WinState state = game.checkIfPlayerWins();
 
         while(state.getState() == WinState.States.NOBODY) {
+
             String play = null;
             int offsetForEnemySlot = 0;
             do {
                 List<String> legalMoves = game.getSelectableSlots();
                 // anfang heuristik block /
+                /* Schauen ob wir schon im endspiel sind, damit die endspieldatenbank greifen kann.
+                int sumOfStones = 0;
+                for (int i = 2; i < 15; i++) {
+                    if(i != 8){
+                        sumOfStones += game.getState().stonesIn(Integer.toString(i));
+                    }
+                    if(sumOfStones > ENDG_DATA_LEN){
+                        break;
+                    }
+                }
+                if(sumOfStones <= ENDG_DATA_LEN){
+                    // schau ma in der datenbank nach und fertig.
+                }
+                */
+
                 int listindex = 0;
                 int[] stonesIn = new int[6];
                 for (int i = 0; i < 6; i++) {
@@ -183,27 +204,29 @@ public class TwoForOneAgent implements MancalaAgent {
                         offsetForEnemySlot = -7;
                     }
                 }
+
+                //System.out.println(Arrays.toString(stonesIn));
                 double[] valueOfMove = new double[6]; // mein gedanke hier ist: wenn man nochmal ziehen darf: +0,5 und wenn man einen stein um ein feld näher zum mancala bewegt +0.125
                 for (int i = 0; i < valueOfMove.length; i++) {
                     while(stonesIn[i] > 0){
                         if(stonesIn[i] == i + 1){
-                            valueOfMove[i] += stonesIn[i]*0.125+0.5;
+                            valueOfMove[i] += stonesIn[i]*H21+H22;
                             break;
                         }
                         if(stonesIn[i] < i + 1){
-                            valueOfMove[i] += stonesIn[i]*0.125;
+                            valueOfMove[i] += stonesIn[i]*H21;
                             if(stonesIn[i - stonesIn[i]] == 0){
-                                valueOfMove[i] += stonesIn[i+offsetForEnemySlot]*2 + (i+1)*0.125;
+                                valueOfMove[i] += stonesIn[i+offsetForEnemySlot]*2 + (i+1)*H21;
                             }
                             break;
                         }
                         if(stonesIn[i] > i + 1){
                             if(stonesIn[i] > i + 12){
-                                valueOfMove[i] -= 12*(1-i*0.125);
+                                valueOfMove[i] -= 12*(1-i*H21);
                                 valueOfMove[i]++;
                                 stonesIn[i] -= 12;
                             } else {
-                                valueOfMove[i] += (i+1)*0.125 - ((i+1) - stonesIn[i])*0.75; // hier könnte man noch elaborieren
+                                valueOfMove[i] += (i+1)*H21 - ((i+1) - stonesIn[i])*(1-2*H21); // hier könnte man noch elaborieren
                                 break;
                             }
                         }
@@ -217,18 +240,19 @@ public class TwoForOneAgent implements MancalaAgent {
                 }
                 for (int i = 0; i < valueOfMove.length; i++) {
                     if(valueOfMove[i] != 0){
-                        valueOfMove[i] += min + 0.25; // es gibt eine chance, dass schlechte züge gespielt werden, aber nur ein sehr geringe.
+                        valueOfMove[i] += min + H23; // es gibt eine chance, dass schlechte züge gespielt werden, aber nur ein sehr geringe.
+                        //System.out.println(i + ": " + valueOfMove[i]);
                     }
                 }
                 double sum = 0;
                 for (double item:valueOfMove) {
                     sum+= item;
                 }
-                double randomValue = (r.nextDouble()*sum);
+                double randomValue = r.nextDouble()*sum;
                 for (int i = 0; i < valueOfMove.length; i++) {
                     sum -= valueOfMove[i];
                     if(randomValue > sum){
-                        play = legalMoves.get(i);
+                        play = Integer.toString(i);
                         break;
                     }
                 }
