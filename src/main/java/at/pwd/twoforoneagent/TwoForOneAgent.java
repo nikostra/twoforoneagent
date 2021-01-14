@@ -144,7 +144,7 @@ public class TwoForOneAgent implements MancalaAgent {
            IStart = false;
         }
         if(openingBookMode){
-            return doOpeningTurn(game,start);
+            return doOpeningTurn(game,start,computationTime);
         }
         // ende eröffnungsbuchblock
 
@@ -191,7 +191,7 @@ public class TwoForOneAgent implements MancalaAgent {
         }
     }
 
-    private MancalaAgentAction doOpeningTurn(MancalaGame game,long start){
+    private MancalaAgentAction doOpeningTurn(MancalaGame game,long start,int computationTime){
         int offset = 0;
         if(Integer.parseInt(game.getSelectableSlots().get(0)) > 8){
             offset = 7;
@@ -212,7 +212,7 @@ public class TwoForOneAgent implements MancalaAgent {
         } else {
             System.out.println("dropped out of Opening Book in Position: " + Arrays.toString(position.toArray()));
             openingBookMode = false;
-            return doTurn((int) (9 - (System.currentTimeMillis() - start)/1000),game);
+            return doTurn((int) (computationTime - 1 - (System.currentTimeMillis() - start)/1000),game);
         }
     }
 
