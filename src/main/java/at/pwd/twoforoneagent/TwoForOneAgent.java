@@ -37,7 +37,7 @@ public class TwoForOneAgent implements MancalaAgent {
         private int winCount;
 
         private MancalaGame game;
-        private WinState winState;
+        private WinState winState; // vielleicht noch einfach abfragen obs 37 oder mehr Steine in einem Mancala sind und dann abbrechen.
         private MCTSTree parent;
         private List<MCTSTree> children;
         String action;
@@ -176,6 +176,9 @@ public class TwoForOneAgent implements MancalaAgent {
                 List<String> legalMoves = game.getSelectableSlots();
                 // anfang heuristik block /
                 /* Schauen ob wir schon im endspiel sind, damit die endspieldatenbank greifen kann.
+
+             ============ Datenbanken auf einem neuen Branch. ============
+
                 int sumOfStones = 0;
                 for (int i = 2; i < 15; i++) {
                     if(i != 8){
@@ -252,7 +255,7 @@ public class TwoForOneAgent implements MancalaAgent {
                 for (int i = 0; i < valueOfMove.length; i++) {
                     sum -= valueOfMove[i];
                     if(randomValue > sum){
-                        play = Integer.toString(i);
+                        play = Integer.toString(i); // da gibts an fehler, slot ohne bohnen selected.
                         break;
                     }
                 }
@@ -263,8 +266,13 @@ public class TwoForOneAgent implements MancalaAgent {
                 // ende heuristikblock /
                 // play = legalMoves.get(r.nextInt(legalMoves.size()));
             } while(game.selectSlot(play));
+            if(game.getState().stonesIn(game.getBoard().getDepotOfPlayer(1)) > 36){
+                return new WinState(WinState.States.SOMEONE,1);
+            }
+            if(game.getState().stonesIn(game.getBoard().getDepotOfPlayer(0)) > 36){
+                return new WinState(WinState.States.SOMEONE,0);
+            }
             game.nextPlayer();
-
             state = game.checkIfPlayerWins();
         }
 
