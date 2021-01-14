@@ -7,10 +7,12 @@ import at.pwd.boardgame.game.mancala.MancalaState;
 import at.pwd.boardgame.game.mancala.agent.MancalaAgent;
 import at.pwd.boardgame.game.mancala.agent.MancalaAgentAction;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.io.IOException;
+import java.lang.reflect.Array;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
 
 /**
  * Changes:
@@ -33,6 +35,11 @@ public class TwoForOneAgent implements MancalaAgent {
     private static final int ENDG_DATA_LEN = 14; // länge der endspieldatenbank
     private static boolean IStart = true;
     private static boolean openingBookMode = false;
+
+    private static Map<ArrayList<Byte>,Integer> openingBook = new HashMap<>();
+
+
+    private static String openingBookFileName = "C:\\Users\\tobij\\OneDrive\\Dokumente\\uni\\Strategy\\src\\main\\java\\at\\pwd\\twoforoneagent\\opening-book-standard-allopenings-2fullmove.zip";
 
     private class MCTSTree {
         private int visitCount;
@@ -119,19 +126,27 @@ public class TwoForOneAgent implements MancalaAgent {
 
     @Override
     public MancalaAgentAction doTurn(int computationTime, MancalaGame game) {
-        /* Fürs eröffnungsbuch
-        if(IStart){
-           if(game.getState().stonesIn("1") == 0 && game.getState().stonesIn("7") == 0){
-               openingBookMode = true;
-           }
-        }
-        IStart = false;
-        if(openingBookMode){
-            doOpeningTurn(game)
-        }
-         */
         long start = System.currentTimeMillis();
         this.originalState = game.getState();
+
+        // start eröffnungsbuchblock
+        if(IStart){
+            System.out.println(game.getState().stonesIn("1") + " " + game.getState().stonesIn("8"));
+           if(game.getState().stonesIn("1") == 0 && game.getState().stonesIn("8") == 0){
+               try {
+                   load(openingBookFileName);
+                   openingBookMode = true;
+               } catch (IOException e) {
+                   e.printStackTrace();
+                   openingBookMode = false;
+               }
+           }
+           IStart = false;
+        }
+        if(openingBookMode){
+            return doOpeningTurn(game,start);
+        }
+        // ende eröffnungsbuchblock
 
         MCTSTree root = new MCTSTree(game);
 
@@ -147,8 +162,58 @@ public class TwoForOneAgent implements MancalaAgent {
         return new MancalaAgentAction(selected.action);
     }
 
-    private MancalaAgentAction doOpeningTurn(MancalaGame game){
-        return null;
+    private void load(String filename) throws IOException {
+        var zipPath = Paths.get(filename);
+        FileSystems.newFileSystem(zipPath,  ClassLoader.getPlatformClassLoader()).getRootDirectories().forEach(root -> {
+            try {
+                var firstPath = Files.walk(root).filter(x -> Files.isRegularFile(x)).findFirst().get();
+                byte[] openingBookData = Files.readAllBytes(firstPath);
+                parseOpeningBook(openingBookData);
+            } catch (Exception e) {
+                throw new RuntimeException(e); // da überleg ma si no was
+            }
+        });
+    }
+    private void parseOpeningBook(byte[] openingBookData){
+        openingBook.clear();
+        for (int i = 4; i < openingBookData.length; i = i +13) {
+            ArrayList<Byte> position = new ArrayList<>(13);
+            int bestMove = -1;
+            for (int j = 0; j < 13; j++) {
+                if(openingBookData[i+j] < 0){
+                    if(bestMove == -1) {
+                        bestMove = j;
+                    }
+                }
+                position.add((byte) (openingBookData[i+j] & 0b01111111));
+            }
+            openingBook.put(position,bestMove);
+        }
+    }
+
+    private MancalaAgentAction doOpeningTurn(MancalaGame game,long start){
+        int offset = 0;
+        if(Integer.parseInt(game.getSelectableSlots().get(0)) > 8){
+            offset = 7;
+        }
+        ArrayList<Byte> position = new ArrayList<>(13);
+        for (int i = 0; i < 6; i++) {
+            position.add((byte) game.getState().stonesIn(Integer.toString(7 - i + offset))) ;
+        }
+        position.add((byte) game.getState().stonesIn(
+                game.getBoard().getDepotOfPlayer(
+                        originalState.getCurrentPlayer())));
+
+        for (int i = 0; i < 6; i++) {
+            position.add((byte) game.getState().stonesIn(Integer.toString(14 - i - offset)));
+        }
+        if(openingBook.containsKey(position)){
+            return new MancalaAgentAction(Integer.toString(7-openingBook.get(position) + offset));
+        } else {
+            System.out.println("dropped out of Opening Book in Position: " + Arrays.toString(position.toArray()));
+            openingBookMode = false;
+            return doTurn((int) (9 - (System.currentTimeMillis() - start)/1000),game);
+        }
     }
 
     private void backup(MCTSTree current, WinState winState) {
@@ -288,6 +353,8 @@ public class TwoForOneAgent implements MancalaAgent {
                     System.out.println("error in heuristic calculation logic");
                     play = legalMoves.get(r.nextInt(legalMoves.size()));
                 }
+
+
 
 
                 // ende heuristikblock /
