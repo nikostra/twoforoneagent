@@ -7,6 +7,7 @@ import at.pwd.boardgame.game.mancala.MancalaState;
 import at.pwd.boardgame.game.mancala.agent.MancalaAgent;
 import at.pwd.boardgame.game.mancala.agent.MancalaAgentAction;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.file.FileSystems;
@@ -39,7 +40,7 @@ public class TwoForOneAgent implements MancalaAgent {
     private static Map<ArrayList<Byte>,Integer> openingBook = new HashMap<>();
 
 
-    private static String openingBookFileName = "C:\\Users\\tobij\\OneDrive\\Dokumente\\uni\\Strategy\\src\\main\\java\\at\\pwd\\twoforoneagent\\opening-book-standard-allopenings-2fullmove.zip";
+    private static String openingBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\opening-book-standard-allopenings-2fullmove.zip");
 
     private class MCTSTree {
         private int visitCount;
