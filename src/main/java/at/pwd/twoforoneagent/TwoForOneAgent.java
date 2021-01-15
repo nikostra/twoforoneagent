@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
@@ -163,18 +164,37 @@ public class TwoForOneAgent implements MancalaAgent {
         return new MancalaAgentAction(selected.action);
     }
 
+    /***************************************************************************************
+     *    Thanks to Anders Carstensen from the University of Southern Denmark for providing us with the opening and endgame book.
+     *
+     *
+     ***************************************************************************************/
     private void load(String filename) throws IOException {
-        var zipPath = Paths.get(filename);
+        Path zipPath = Paths.get(filename);
         FileSystems.newFileSystem(zipPath,  ClassLoader.getPlatformClassLoader()).getRootDirectories().forEach(root -> {
             try {
-                var firstPath = Files.walk(root).filter(x -> Files.isRegularFile(x)).findFirst().get();
-                byte[] openingBookData = Files.readAllBytes(firstPath);
+                Path firstPath = Files.walk(root).filter(x -> Files.isRegularFile(x)).findFirst().get();
+                byte[] openingBookData = Files.readAllBytes(firstPath); // Das File wird in ein byte array geladen.
                 parseOpeningBook(openingBookData);
             } catch (Exception e) {
                 throw new RuntimeException(e); // da überleg ma si no was
             }
         });
     }
+
+    /**
+     * The Format for the openingBookData:
+     * We don't need the first 4 Bytes.
+     *
+     * then the next Bytes are structured:
+     * one byte per slot:
+     * 6 bytes for your slots,
+     * 1 byte for your kalaha,
+     * 6 bytes for the opponents slots,
+     *
+     * the value of the byte is equal to the number of beans in the slot.
+     * if the highest bit is set: the move leads to a winning position.
+     * */
     private void parseOpeningBook(byte[] openingBookData){
         openingBook.clear();
         for (int i = 4; i < openingBookData.length; i = i +13) {
@@ -197,7 +217,7 @@ public class TwoForOneAgent implements MancalaAgent {
         if(Integer.parseInt(game.getSelectableSlots().get(0)) > 8){
             offset = 7;
         }
-        ArrayList<Byte> position = new ArrayList<>(13);
+        ArrayList<Byte> position = new ArrayList<>(13); // this is the postions which is used as a key in the hashmap.
         for (int i = 0; i < 6; i++) {
             position.add((byte) game.getState().stonesIn(Integer.toString(7 - i + offset))) ;
         }
