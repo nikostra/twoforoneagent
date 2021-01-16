@@ -12,10 +12,12 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLClassLoader;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.SecureClassLoader;
 import java.util.*;
 
 /**
@@ -44,6 +46,8 @@ public class TwoForOneAgent implements MancalaAgent {
 
 
     private static String openingBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\opening-book-standard-allopenings-2fullmove.zip");
+    private static File openingBookFile = new File(openingBookFileName);
+
 
     private class MCTSTree {
         private int visitCount;
@@ -172,9 +176,9 @@ public class TwoForOneAgent implements MancalaAgent {
      *
      ***************************************************************************************/
     private void loadOpeningDatabase(String filename) throws URISyntaxException, IOException {
-        //Path zipPath = Paths.get(filename);
+        Path zipPath = Paths.get(filename);
 
-            FileSystems.newFileSystem(new URI(filename), Collections.emptyMap()).getRootDirectories().forEach(root -> {
+            FileSystems.newFileSystem(zipPath, ClassLoader.getSystemClassLoader()).getRootDirectories().forEach(root -> {
                 try {
                     Path firstPath = Files.walk(root).filter(x -> Files.isRegularFile(x)).findFirst().get();
                     byte[] openingBookData = Files.readAllBytes(firstPath); // Das File wird in ein byte array geladen.
