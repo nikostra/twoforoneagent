@@ -39,15 +39,14 @@ public class TwoForOneAgent implements MancalaAgent {
     private static final double H22 = 0.5; // Wie gut ist es nochmal dranzukommen.
     private static final double H23 = 0.25; // Welchen Wert soll der schlechteste Zug haben.
     private static final int ENDG_DATA_LEN = 14; // länge der endspieldatenbank
-    private static boolean IStart = true;
-    private static boolean openingBookMode = false;
+    private boolean openingBookMode = false;
 
-    private static Map<ArrayList<Byte>,Integer> openingBook = new HashMap<>();
+    private Map<ArrayList<Byte>,Integer> openingBook = new HashMap<>();
 
-    private static String openingBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\opening-book-standard-allopenings-2fullmove.zip");
-    private static String endgameBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\endgame-standard.zip");
+    private String openingBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\opening-book-standard-allopenings-2fullmove.zip");
+    private String endgameBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\endgame-standard.zip");
 
-    private static byte[][] endgameData = new byte[ENDG_DATA_LEN + 1][];
+    private byte[][] endgameData = new byte[ENDG_DATA_LEN + 1][];
 
     private class MCTSTree {
         private int visitCount;
@@ -86,7 +85,6 @@ public class TwoForOneAgent implements MancalaAgent {
 
                 if(terminal){
                     System.out.println("stones: " + stones + ", action: " + action);
-
                     if(action < 8 && (stones == (action-1))){
                         addedValue = H11;
                     } else if(action > 8 && ((action - 8) == stones)){
@@ -101,7 +99,12 @@ public class TwoForOneAgent implements MancalaAgent {
                     } else if(action > 8 && ((action - 8) == stones)){
                         addedValue = H12;
                     }
-                    currentValue = wC / vC + C * Math.sqrt(2 * Math.log(visitCount) / vC) + addedValue;
+                    if(game.getState().getCurrentPlayer() != originalState.getCurrentPlayer()){
+                        currentValue = vC - wC / vC + C * Math.sqrt(2 * Math.log(visitCount) / vC) + addedValue;
+                    } else {
+                        currentValue = wC / vC + C * Math.sqrt(2 * Math.log(visitCount) / vC) + addedValue;
+                    }
+
                 }
 
                 if (best == null || currentValue > value) {
@@ -281,9 +284,6 @@ public class TwoForOneAgent implements MancalaAgent {
 
     private void backup(MCTSTree current, WinState winState) {
         boolean hasWon = winState.getState() == WinState.States.SOMEONE && winState.getPlayerId() == originalState.getCurrentPlayer();
-        if(current.game.getState().getCurrentPlayer() != originalState.getCurrentPlayer()){
-            hasWon = !hasWon;
-        }
 
         while (current != null) {
             current.visitCount++;
@@ -327,11 +327,6 @@ public class TwoForOneAgent implements MancalaAgent {
                 List<String> legalMoves = game.getSelectableSlots();
                 // anfang heuristik block /
 
-
-
-
-
-
                 int[] stonesIn = new int[6];
                 if(Integer.parseInt(legalMoves.get(0)) > 8){
                     for (int i = 0; i < stonesIn.length; i++) {
@@ -362,7 +357,7 @@ public class TwoForOneAgent implements MancalaAgent {
                     board[i+4] = game.getState().stonesIn(Integer.toString(i + offsetForEnemySlot));
                 }
                 if(sumOfStones <= ENDG_DATA_LEN){
-                    int score = endgameData[sumOfStones][getPosOfBoardInEndgData(board)]; // + mein mancala - gegners mancala
+                    int score = endgameData[sumOfStones][getPosOfBoardInEndgData(board)] + game.getState().stonesIn(game.getBoard().getDepotOfPlayer(game.getState().getCurrentPlayer())) - game.getState().stonesIn(game.getBoard().getDepotOfPlayer(1 - game.getState().getCurrentPlayer())) ; // + mein mancala - gegners mancala
                     if(score > 0){
                         return new WinState(WinState.States.SOMEONE,game.getState().getCurrentPlayer());
                     } else {
@@ -443,17 +438,11 @@ public class TwoForOneAgent implements MancalaAgent {
                 // ende heuristikblock /
                 //play = legalMoves.get(r.nextInt(legalMoves.size()));
             } while(game.selectSlot(play));
-
-            // wenns schon aus is kann man früher abbrechen
-            if(game.getState().stonesIn(game.getBoard().getDepotOfPlayer(1)) > 36){
-                return new WinState(WinState.States.SOMEONE,1);
-            }
-            if(game.getState().stonesIn(game.getBoard().getDepotOfPlayer(0)) > 36){
-                return new WinState(WinState.States.SOMEONE,0);
-            }
-
-
             game.nextPlayer();
+            // wenns schon aus is kann man früher abbrechen
+            if(game.getState().stonesIn(game.getBoard().getDepotOfPlayer(game.getState().getCurrentPlayer())) > 36){
+                return new WinState(WinState.States.SOMEONE,game.getState().getCurrentPlayer());
+            }
             state = game.checkIfPlayerWins();
 
         }
