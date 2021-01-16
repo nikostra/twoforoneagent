@@ -1,30 +1,31 @@
 package at.pwd.twoforoneagent;
 
-
 import at.pwd.boardgame.game.base.WinState;
 import at.pwd.boardgame.game.mancala.MancalaGame;
 import at.pwd.boardgame.game.mancala.MancalaState;
 import at.pwd.boardgame.game.mancala.agent.MancalaAgent;
 import at.pwd.boardgame.game.mancala.agent.MancalaAgentAction;
 
-import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Array;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLClassLoader;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.SecureClassLoader;
+import java.io.InputStream;
 import java.util.*;
 
 /**
- * Changes:
- * UCT algorithm only used for choosing child node, not for choosing final move.
+ * Our agent:
+ * Using an opening book to optimise early playout (only applies when agent is starting the game)
+ * Using an endgame book to optimise playout performance.
+ * Playout is happening heuristically (Heuristic 2)
  * Heuristic 1: (Parameter: H11 + H12): preferring moves that end in the players depot, thus granting another move.
- *      H11 is for final move decision making, H12 is for the selection step
+ *      H11 is for final move decision making
+ *      H12 is for the selection step
+ * Heuristic 2: Improving the playout phase from random playout, to  move selection based on several parameters:
+ *      H21: Value of pieces moving forward
+ *      H22: How much having another move is worth
+ *      H23: Value of the worst move (to ensures bad plays are still being considered)
+ *
+ *  (Improvements from template):
+ *  * UCT value only used for choosing child node, not for choosing final move.
+ *  * Ensuring every child node is selected during selection step.
  */
 public class TwoForOneAgent implements MancalaAgent {
 
@@ -33,18 +34,18 @@ public class TwoForOneAgent implements MancalaAgent {
 
     //parameters
     private static final double C = 1.0f/Math.sqrt(2.0f);
-    private static final double H11 = 0.0625; // die Werte find ich cool, aber ich glaub sie sollen ziemlich klein sein, vielleicht 0.0625 oder 0.125 und
-    private static final double H12 = 0.0625; // gegen Ende der Berechnungszeit sollen die 2 Werte auf jeden Fall gleich sein,
-    private static final double H21 = 0.125; // Wie viel mehr wert sind sie Steine wenn sie 1 Feld weiter vorne sind.
-    private static final double H22 = 0.5; // Wie gut ist es nochmal dranzukommen.
-    private static final double H23 = 0.25; // Welchen Wert soll der schlechteste Zug haben.
-    private static final int ENDG_DATA_LEN = 14; // länge der endspieldatenbank
+    private static final double H11 = 0.0625;
+    private static final double H12 = 0.0625;
+    private static final double H21 = 0.125;
+    private static final double H22 = 0.5;
+    private static final double H23 = 0.25;
+    private static final int ENDG_DATA_LEN = 14;
     private boolean openingBookMode = false;
 
     private Map<ArrayList<Byte>,Integer> openingBook = new HashMap<>();
 
-    private String openingBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\opening-book-standard-allopenings-2fullmove.zip");
-    private String endgameBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\endgame-standard.zip");
+    private String endgameBookFileName = "kalaha_endgame_";
+    private String openingBookFileName = "openingBook";
 
     private byte[][] endgameData = new byte[ENDG_DATA_LEN + 1][];
 
@@ -57,8 +58,6 @@ public class TwoForOneAgent implements MancalaAgent {
         private MCTSTree parent;
         private List<MCTSTree> children;
         String action;
-
-
 
         MCTSTree(MancalaGame game) {
             this.game = game;
@@ -82,7 +81,7 @@ public class TwoForOneAgent implements MancalaAgent {
                 int action = Integer.parseInt(m.action);
                 int stones = game.getState().stonesIn(m.action);
 
-
+                //heuristic 1
                 if(terminal){
                     System.out.println("stones: " + stones + ", action: " + action);
                     if(action < 8 && (stones == (action-1))){
@@ -99,12 +98,12 @@ public class TwoForOneAgent implements MancalaAgent {
                     } else if(action > 8 && ((action - 8) == stones)){
                         addedValue = H12;
                     }
+
                     if(game.getState().getCurrentPlayer() != originalState.getCurrentPlayer()){
                         currentValue = vC - wC / vC + C * Math.sqrt(2 * Math.log(visitCount) / vC) + addedValue;
                     } else {
                         currentValue = wC / vC + C * Math.sqrt(2 * Math.log(visitCount) / vC) + addedValue;
                     }
-
                 }
 
                 if (best == null || currentValue > value) {
@@ -139,6 +138,7 @@ public class TwoForOneAgent implements MancalaAgent {
     public MancalaAgentAction doTurn(int computationTime, MancalaGame game) {
         long start = System.currentTimeMillis();
         this.originalState = game.getState();
+
         if(game.getState().stonesIn("1") == 0 && game.getState().stonesIn("8") == 0){
             try {
                 loadOpeningDatabase(openingBookFileName);
@@ -155,6 +155,7 @@ public class TwoForOneAgent implements MancalaAgent {
                 e.printStackTrace();
             }
         }
+
         if(game.getState().stonesIn("1") == 0 && game.getState().stonesIn("8") == 0){
                try {
                    loadOpeningDatabase(openingBookFileName);
@@ -168,7 +169,6 @@ public class TwoForOneAgent implements MancalaAgent {
         if(openingBookMode){
             return doOpeningTurn(game,start,computationTime);
         }
-        // ende eröffnungsbuchblock
 
         MCTSTree root = new MCTSTree(game);
 
@@ -185,69 +185,58 @@ public class TwoForOneAgent implements MancalaAgent {
     }
 
     /***************************************************************************************
-     *    Thanks to Anders Carstensen from the University of Southern Denmark for providing us with the opening and endgame book.
-     *
-     *
+     *    Thanks to Anders Carstensen from the University of Southern Denmark for
+     *    providing us with the opening and endgame book.
      ***************************************************************************************/
     private void loadOpeningDatabase(String filename) throws IOException {
-        Path zipPath = Paths.get(filename);
-
-            FileSystems.newFileSystem(zipPath, ClassLoader.getSystemClassLoader()).getRootDirectories().forEach(root -> {
-                try {
-                    Path firstPath = Files.walk(root).filter(x -> Files.isRegularFile(x)).findFirst().get();
-                    byte[] openingBookData = Files.readAllBytes(firstPath); // Das File wird in ein byte array geladen.
-                    parseOpeningBook(openingBookData);
-                } catch (Exception e) {
-                    throw new RuntimeException(e); // da überleg ma si no was
-                }
-            });
-
+        ClassLoader classLoader = getClass().getClassLoader();
+        InputStream inputStream = classLoader.getResourceAsStream(filename);
+        byte[] bytes = new byte[inputStream.available()];
+        inputStream.read(bytes);
+        parseOpeningBook(bytes);
     }
 
     /***************************************************************************************
-     *    Thanks to Anders Carstensen from the University of Southern Denmark for providing us with the opening and endgame book.
-     *
-     *
+     *    Thanks to Anders Carstensen from the University of Southern Denmark for
+     *    providing us with the opening and endgame book.
      ***************************************************************************************/
     private void loadEndgameDatabase(String filename) throws IOException {
-        Path zipPath = Paths.get(filename);
+        ClassLoader classLoader = getClass().getClassLoader();
 
-        FileSystems.newFileSystem(zipPath, ClassLoader.getSystemClassLoader()).getRootDirectories().forEach(root -> {
-            try {
+        try {
                 for (int i = 1; i <= ENDG_DATA_LEN; i++) {
-                    Path path = root.resolve("/kalaha_endgame_" + i);
-                    if (!Files.exists(path))
-                        continue;
-                    endgameData[i] = Files.readAllBytes(path);
+                    InputStream inputStream = classLoader.getResourceAsStream(filename + i);
+                    byte[] bytes = new byte[inputStream.available()];
+                    inputStream.read(bytes);
+                    endgameData[i] = bytes;
                 }
             } catch (Exception e) {
-                throw new RuntimeException(e); // da überleg ma si no was
+                throw new RuntimeException(e);
             }
-        });
-
     }
 
-    /**
-     * The Format for the openingBookData:
-     * We don't need the first 4 Bytes.
-     *
-     * then the next Bytes are structured:
-     * one byte per slot:
-     * 6 bytes for your slots,
-     * 1 byte for your kalaha,
-     * 6 bytes for the opponents slots,
-     *
-     * the value of the byte is equal to the number of beans in the slot.
-     * if the highest bit is set: the move leads to a winning position.
-     * */
+
+        /**
+         * The Format for the openingBookData:
+         * We don't need the first 4 Bytes.
+         *
+         * then the next Bytes are structured:
+         * one byte per slot:
+         * 6 bytes for your slots,
+         * 1 byte for your kalaha,
+         * 6 bytes for the opponents slots,
+         *
+         * the value of the byte is equal to the number of beans in the slot.
+         * if the highest bit is set: the move leads to a winning position.
+         * */
     private void parseOpeningBook(byte[] openingBookData){
         openingBook.clear();
-        for (int i = 4; i < openingBookData.length; i = i +13) {
+        for (int i = 4; i + 13 < openingBookData.length; i = i +13) {
             ArrayList<Byte> position = new ArrayList<>(13);
             int bestMove = -1;
             for (int j = 0; j < 13; j++) {
-                if(openingBookData[i+j] < 0){
 
+                if(openingBookData[i+j] < 0){
                         bestMove = j;
 
                 }
@@ -257,6 +246,9 @@ public class TwoForOneAgent implements MancalaAgent {
         }
     }
 
+    /**
+     * parse a move from the opening book
+     */
     private MancalaAgentAction doOpeningTurn(MancalaGame game,long start,int computationTime){
         int offset = 0;
         if(Integer.parseInt(game.getSelectableSlots().get(0)) > 8){
@@ -283,12 +275,12 @@ public class TwoForOneAgent implements MancalaAgent {
     }
 
     private void backup(MCTSTree current, WinState winState) {
-        boolean hasWon = winState.getState() == WinState.States.SOMEONE && winState.getPlayerId() == originalState.getCurrentPlayer();
+        boolean hasWon = winState.getState() == WinState.States.SOMEONE
+                && winState.getPlayerId() == originalState.getCurrentPlayer();
 
         while (current != null) {
             current.visitCount++;
             current.winCount += hasWon ? 1 : 0;
-
             current = current.parent;
         }
     }
@@ -325,7 +317,7 @@ public class TwoForOneAgent implements MancalaAgent {
             do {
                 int offsetForEnemySlot = 0;
                 List<String> legalMoves = game.getSelectableSlots();
-                // anfang heuristik block /
+                // begin heuristics
 
                 int[] stonesIn = new int[6];
                 if(Integer.parseInt(legalMoves.get(0)) > 8){
@@ -339,7 +331,7 @@ public class TwoForOneAgent implements MancalaAgent {
                     }
                 }
 
-                // Schauen ob wir schon im endspiel sind, damit die endspieldatenbank greifen kann.
+                // Checking if endgame book applies
                 int sumOfStones = 0;
                 for (int item:stonesIn) {
                     sumOfStones += item;
@@ -363,11 +355,10 @@ public class TwoForOneAgent implements MancalaAgent {
                     } else {
                         return new WinState(WinState.States.SOMEONE,1 - game.getState().getCurrentPlayer());
                     }
-                    //if(score == 0){// draw}
                 }
 
 
-                double[] valueOfMove = new double[6]; // mein gedanke hier ist: wenn man nochmal ziehen darf: +0,5 und wenn man einen stein um ein feld näher zum mancala bewegt +0.125
+                double[] valueOfMove = new double[6];
                 for (int i = 0; i < valueOfMove.length; i++) {
                     while(stonesIn[i] > 0){
                         if(stonesIn[i] == i + 1){
@@ -387,8 +378,8 @@ public class TwoForOneAgent implements MancalaAgent {
                                 valueOfMove[i]++;
                                 stonesIn[i] -= 12;
                             } else {
-                                valueOfMove[i] += (i+1)*H21 - (stonesIn[i] - (i+1))*(1-2*H21); // hier könnte man noch elaborieren, weil er checkt nicht wenn steine wieder auf deine Seite gehen
-                                break;                                                         // und das könnt scho relevant sein weil ma ja die Steine vom anderen schlagen kann.
+                                valueOfMove[i] += (i+1)*H21 - (stonesIn[i] - (i+1))*(1-2*H21);
+                                break;
                             }
                         }
                     }
@@ -402,7 +393,7 @@ public class TwoForOneAgent implements MancalaAgent {
                 if(min < 0){
                     for (int i = 0; i < valueOfMove.length; i++) {
                         if(valueOfMove[i] != 0){
-                            valueOfMove[i] -= min - H23; // es gibt eine chance, dass schlechte züge gespielt werden, aber nur ein sehr geringe.
+                            valueOfMove[i] -= min - H23;
                         }
                     }
                 }
@@ -432,14 +423,9 @@ public class TwoForOneAgent implements MancalaAgent {
                     play = legalMoves.get(r.nextInt(legalMoves.size()));
                 }
 
-
-
-
-                // ende heuristikblock /
-                //play = legalMoves.get(r.nextInt(legalMoves.size()));
             } while(game.selectSlot(play));
             game.nextPlayer();
-            // wenns schon aus is kann man früher abbrechen
+
             if(game.getState().stonesIn(game.getBoard().getDepotOfPlayer(game.getState().getCurrentPlayer())) > 36){
                 return new WinState(WinState.States.SOMEONE,game.getState().getCurrentPlayer());
             }
