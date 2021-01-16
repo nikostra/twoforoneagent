@@ -281,6 +281,9 @@ public class TwoForOneAgent implements MancalaAgent {
 
     private void backup(MCTSTree current, WinState winState) {
         boolean hasWon = winState.getState() == WinState.States.SOMEONE && winState.getPlayerId() == originalState.getCurrentPlayer();
+        if(current.game.getState().getCurrentPlayer() != originalState.getCurrentPlayer()){
+            hasWon = !hasWon;
+        }
 
         while (current != null) {
             current.visitCount++;
@@ -438,9 +441,10 @@ public class TwoForOneAgent implements MancalaAgent {
 
 
                 // ende heuristikblock /
-                play = legalMoves.get(r.nextInt(legalMoves.size()));
+                //play = legalMoves.get(r.nextInt(legalMoves.size()));
             } while(game.selectSlot(play));
 
+            // wenns schon aus is kann man früher abbrechen
             if(game.getState().stonesIn(game.getBoard().getDepotOfPlayer(1)) > 36){
                 return new WinState(WinState.States.SOMEONE,1);
             }
