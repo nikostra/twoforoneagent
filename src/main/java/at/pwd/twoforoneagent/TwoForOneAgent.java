@@ -44,10 +44,10 @@ public class TwoForOneAgent implements MancalaAgent {
 
     private static Map<ArrayList<Byte>,Integer> openingBook = new HashMap<>();
 
-
     private static String openingBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\opening-book-standard-allopenings-2fullmove.zip");
-    private static File openingBookFile = new File(openingBookFileName);
+    private static String endgameBookFileName = new File("").getAbsolutePath().concat("\\src\\main\\endgame-standard.zip");
 
+    private static byte[][] endgameData = new byte[ENDG_DATA_LEN + 1][];
 
     private class MCTSTree {
         private int visitCount;
@@ -136,7 +136,13 @@ public class TwoForOneAgent implements MancalaAgent {
     public MancalaAgentAction doTurn(int computationTime, MancalaGame game) {
         long start = System.currentTimeMillis();
         this.originalState = game.getState();
-
+        if(endgameData[0] == null){
+            try {
+                loadEndgameDatabase(endgameBookFileName);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         // start eröffnungsbuchblock
         if(IStart){
             System.out.println(game.getState().stonesIn("1") + " " + game.getState().stonesIn("8"));
@@ -144,13 +150,16 @@ public class TwoForOneAgent implements MancalaAgent {
                try {
                    loadOpeningDatabase(openingBookFileName);
                    openingBookMode = true;
-               } catch (IOException | URISyntaxException e) {
+               } catch (IOException e) {
                    e.printStackTrace();
                    openingBookMode = false;
                }
            }
+
            IStart = false;
+           return new MancalaAgentAction(game.getSelectableSlots().get(0));
         }
+
         if(openingBookMode){
             return doOpeningTurn(game,start,computationTime);
         }
@@ -175,7 +184,7 @@ public class TwoForOneAgent implements MancalaAgent {
      *
      *
      ***************************************************************************************/
-    private void loadOpeningDatabase(String filename) throws URISyntaxException, IOException {
+    private void loadOpeningDatabase(String filename) throws IOException {
         Path zipPath = Paths.get(filename);
 
             FileSystems.newFileSystem(zipPath, ClassLoader.getSystemClassLoader()).getRootDirectories().forEach(root -> {
@@ -187,6 +196,29 @@ public class TwoForOneAgent implements MancalaAgent {
                     throw new RuntimeException(e); // da überleg ma si no was
                 }
             });
+
+    }
+
+    /***************************************************************************************
+     *    Thanks to Anders Carstensen from the University of Southern Denmark for providing us with the opening and endgame book.
+     *
+     *
+     ***************************************************************************************/
+    private void loadEndgameDatabase(String filename) throws IOException {
+        Path zipPath = Paths.get(filename);
+
+        FileSystems.newFileSystem(zipPath, ClassLoader.getSystemClassLoader()).getRootDirectories().forEach(root -> {
+            try {
+                for (int i = 1; i <= ENDG_DATA_LEN; i++) {
+                    Path path = root.resolve("/kalaha_endgame_" + i);
+                    if (!Files.exists(path))
+                        continue;
+                    endgameData[i] = Files.readAllBytes(path);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e); // da überleg ma si no was
+            }
+        });
 
     }
 
@@ -210,9 +242,9 @@ public class TwoForOneAgent implements MancalaAgent {
             int bestMove = -1;
             for (int j = 0; j < 13; j++) {
                 if(openingBookData[i+j] < 0){
-                    if(bestMove == -1) {
+
                         bestMove = j;
-                    }
+
                 }
                 position.add((byte) (openingBookData[i+j] & 0b01111111));
             }
@@ -289,21 +321,10 @@ public class TwoForOneAgent implements MancalaAgent {
                 int offsetForEnemySlot = 0;
                 List<String> legalMoves = game.getSelectableSlots();
                 // anfang heuristik block /
-                /* Schauen ob wir schon im endspiel sind, damit die endspieldatenbank greifen kann.
-             ============ Datenbanken auf einem neuen Branch. ============
-                int sumOfStones = 0;
-                for (int i = 2; i < 15; i++) {
-                    if(i != 8){
-                        sumOfStones += game.getState().stonesIn(Integer.toString(i));
-                    }
-                    if(sumOfStones > ENDG_DATA_LEN){
-                        break;
-                    }
-                }
-                if(sumOfStones <= ENDG_DATA_LEN){
-                    // schau ma in der datenbank nach und fertig.
-                }
-                 */
+
+
+
+
 
 
                 int[] stonesIn = new int[6];
@@ -317,6 +338,35 @@ public class TwoForOneAgent implements MancalaAgent {
                         stonesIn[i] = game.getState().stonesIn(Integer.toString(i + 2));
                     }
                 }
+
+                // Schauen ob wir schon im endspiel sind, damit die endspieldatenbank greifen kann.
+                /*
+                int sumOfStones = 0;
+                for (int item:stonesIn) {
+                    sumOfStones += item;
+                }
+                for (int i = 2; i < 9; i++) {
+                    if(sumOfStones > ENDG_DATA_LEN){
+                        break;
+                    }
+                    if(i != 8){
+                        sumOfStones += game.getState().stonesIn(Integer.toString(i + offsetForEnemySlot));
+                    }
+                }
+                int[] board = Arrays.copyOf(stonesIn,11);
+                if(sumOfStones <= ENDG_DATA_LEN){
+                    int score = endgameData[sumOfStones][getPosOfBoardInEndgData(board)]; // + mein mancala - gegners mancala
+                    if(score > 0){
+                        // I win
+                    }
+                    if(score < 0){
+                        // opponent wins
+                    }
+                    if(score == 0){
+                        // draw
+                    }
+                }
+                */
 
                 double[] valueOfMove = new double[6]; // mein gedanke hier ist: wenn man nochmal ziehen darf: +0,5 und wenn man einen stein um ein feld näher zum mancala bewegt +0.125
                 for (int i = 0; i < valueOfMove.length; i++) {
@@ -404,6 +454,29 @@ public class TwoForOneAgent implements MancalaAgent {
         }
 
         return state;
+    }
+
+    private int getPosOfBoardInEndgData(int[] board) {
+        int ret = 0;
+        int c = 0;
+        for (int i = 0; i < 12;) {
+            c += board[i];
+            i++;
+            ret += binomial(c, i);
+            c++;
+        }
+        return ret;
+    }
+
+    private int binomial(int n, int k) {
+        int r = 1, d;
+        if (k > n)
+            return 0;
+        for (d = 1; d <= k; d++) {
+            r *= n--;
+            r /= d;
+        }
+        return r;
     }
 
     @Override
