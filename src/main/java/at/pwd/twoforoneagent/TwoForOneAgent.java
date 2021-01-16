@@ -136,6 +136,15 @@ public class TwoForOneAgent implements MancalaAgent {
     public MancalaAgentAction doTurn(int computationTime, MancalaGame game) {
         long start = System.currentTimeMillis();
         this.originalState = game.getState();
+        if(game.getState().stonesIn("1") == 0 && game.getState().stonesIn("8") == 0){
+            try {
+                loadOpeningDatabase(openingBookFileName);
+                openingBookMode = true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                openingBookMode = false;
+            }
+        }
         if(endgameData[0] == null){
             try {
                 loadEndgameDatabase(endgameBookFileName);
@@ -143,10 +152,7 @@ public class TwoForOneAgent implements MancalaAgent {
                 e.printStackTrace();
             }
         }
-        // start eröffnungsbuchblock
-        if(IStart){
-            System.out.println(game.getState().stonesIn("1") + " " + game.getState().stonesIn("8"));
-           if(game.getState().stonesIn("1") == 0 && game.getState().stonesIn("8") == 0){
+        if(game.getState().stonesIn("1") == 0 && game.getState().stonesIn("8") == 0){
                try {
                    loadOpeningDatabase(openingBookFileName);
                    openingBookMode = true;
@@ -154,12 +160,8 @@ public class TwoForOneAgent implements MancalaAgent {
                    e.printStackTrace();
                    openingBookMode = false;
                }
-           }
-
-           IStart = false;
-           return new MancalaAgentAction(game.getSelectableSlots().get(0));
+               return new MancalaAgentAction(game.getSelectableSlots().get(0));
         }
-
         if(openingBookMode){
             return doOpeningTurn(game,start,computationTime);
         }
@@ -340,7 +342,6 @@ public class TwoForOneAgent implements MancalaAgent {
                 }
 
                 // Schauen ob wir schon im endspiel sind, damit die endspieldatenbank greifen kann.
-                /*
                 int sumOfStones = 0;
                 for (int item:stonesIn) {
                     sumOfStones += item;
@@ -354,19 +355,19 @@ public class TwoForOneAgent implements MancalaAgent {
                     }
                 }
                 int[] board = Arrays.copyOf(stonesIn,11);
+                for (int i = 2; i < 7; i++) {
+                    board[i+4] = game.getState().stonesIn(Integer.toString(i + offsetForEnemySlot));
+                }
                 if(sumOfStones <= ENDG_DATA_LEN){
                     int score = endgameData[sumOfStones][getPosOfBoardInEndgData(board)]; // + mein mancala - gegners mancala
                     if(score > 0){
-                        // I win
+                        return new WinState(WinState.States.SOMEONE,game.getState().getCurrentPlayer());
+                    } else {
+                        return new WinState(WinState.States.SOMEONE,1 - game.getState().getCurrentPlayer());
                     }
-                    if(score < 0){
-                        // opponent wins
-                    }
-                    if(score == 0){
-                        // draw
-                    }
+                    //if(score == 0){// draw}
                 }
-                */
+
 
                 double[] valueOfMove = new double[6]; // mein gedanke hier ist: wenn man nochmal ziehen darf: +0,5 und wenn man einen stein um ein feld näher zum mancala bewegt +0.125
                 for (int i = 0; i < valueOfMove.length; i++) {
@@ -459,7 +460,7 @@ public class TwoForOneAgent implements MancalaAgent {
     private int getPosOfBoardInEndgData(int[] board) {
         int ret = 0;
         int c = 0;
-        for (int i = 0; i < 12;) {
+        for (int i = 0; i < 11;) {
             c += board[i];
             i++;
             ret += binomial(c, i);
