@@ -10,6 +10,8 @@ import at.pwd.boardgame.game.mancala.agent.MancalaAgentAction;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -136,9 +138,9 @@ public class TwoForOneAgent implements MancalaAgent {
             System.out.println(game.getState().stonesIn("1") + " " + game.getState().stonesIn("8"));
            if(game.getState().stonesIn("1") == 0 && game.getState().stonesIn("8") == 0){
                try {
-                   load(openingBookFileName);
+                   loadOpeningDatabase(openingBookFileName);
                    openingBookMode = true;
-               } catch (IOException e) {
+               } catch (IOException | URISyntaxException e) {
                    e.printStackTrace();
                    openingBookMode = false;
                }
@@ -169,17 +171,19 @@ public class TwoForOneAgent implements MancalaAgent {
      *
      *
      ***************************************************************************************/
-    private void load(String filename) throws IOException {
-        Path zipPath = Paths.get(filename);
-        FileSystems.newFileSystem(zipPath,  ClassLoader.getPlatformClassLoader()).getRootDirectories().forEach(root -> {
-            try {
-                Path firstPath = Files.walk(root).filter(x -> Files.isRegularFile(x)).findFirst().get();
-                byte[] openingBookData = Files.readAllBytes(firstPath); // Das File wird in ein byte array geladen.
-                parseOpeningBook(openingBookData);
-            } catch (Exception e) {
-                throw new RuntimeException(e); // da überleg ma si no was
-            }
-        });
+    private void loadOpeningDatabase(String filename) throws URISyntaxException, IOException {
+        //Path zipPath = Paths.get(filename);
+
+            FileSystems.newFileSystem(new URI(filename), Collections.emptyMap()).getRootDirectories().forEach(root -> {
+                try {
+                    Path firstPath = Files.walk(root).filter(x -> Files.isRegularFile(x)).findFirst().get();
+                    byte[] openingBookData = Files.readAllBytes(firstPath); // Das File wird in ein byte array geladen.
+                    parseOpeningBook(openingBookData);
+                } catch (Exception e) {
+                    throw new RuntimeException(e); // da überleg ma si no was
+                }
+            });
+
     }
 
     /**
