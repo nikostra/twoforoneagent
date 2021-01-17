@@ -6,6 +6,7 @@ import at.pwd.boardgame.game.mancala.MancalaState;
 import at.pwd.boardgame.game.mancala.agent.MancalaAgent;
 import at.pwd.boardgame.game.mancala.agent.MancalaAgentAction;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
@@ -139,15 +140,6 @@ public class TwoForOneAgent implements MancalaAgent {
         long start = System.currentTimeMillis();
         this.originalState = game.getState();
 
-        if(game.getState().stonesIn("1") == 0 && game.getState().stonesIn("8") == 0){
-            try {
-                loadOpeningDatabase(openingBookFileName);
-                openingBookMode = true;
-            } catch (IOException e) {
-                e.printStackTrace();
-                openingBookMode = false;
-            }
-        }
         if(endgameData[0] == null){
             try {
                 loadEndgameDatabase(endgameBookFileName);
@@ -172,7 +164,7 @@ public class TwoForOneAgent implements MancalaAgent {
 
         MCTSTree root = new MCTSTree(game);
 
-        while ((System.currentTimeMillis() - start) < (computationTime*1000 - 100)) {
+        while ((System.currentTimeMillis() - start) < (computationTime*1000 - 500)) {
             MCTSTree best = treePolicy(root);
             WinState winning = defaultPolicy(best.game);
             backup(best, winning);
@@ -190,9 +182,15 @@ public class TwoForOneAgent implements MancalaAgent {
      ***************************************************************************************/
     private void loadOpeningDatabase(String filename) throws IOException {
         ClassLoader classLoader = getClass().getClassLoader();
-        InputStream inputStream = classLoader.getResourceAsStream(filename);
-        byte[] bytes = new byte[inputStream.available()];
-        inputStream.read(bytes);
+        InputStream is = classLoader.getResourceAsStream(filename);
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] bytes = new byte[is.available()];
+        int nRead;
+
+        while ((nRead = is.read(bytes, 0, bytes.length)) != -1) {
+            buffer.write(bytes, 0, nRead);
+        }
+        bytes = buffer.toByteArray();
         parseOpeningBook(bytes);
     }
 
@@ -205,9 +203,14 @@ public class TwoForOneAgent implements MancalaAgent {
 
         try {
                 for (int i = 1; i <= ENDG_DATA_LEN; i++) {
-                    InputStream inputStream = classLoader.getResourceAsStream(filename + i);
-                    byte[] bytes = new byte[inputStream.available()];
-                    inputStream.read(bytes);
+                    InputStream is = classLoader.getResourceAsStream(filename + i);
+                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                    byte[] bytes = new byte[is.available()];
+                    int nRead;
+                    while ((nRead = is.read(bytes, 0, bytes.length)) != -1) {
+                        buffer.write(bytes, 0, nRead);
+                    }
+                    bytes = buffer.toByteArray();
                     endgameData[i] = bytes;
                 }
             } catch (Exception e) {
