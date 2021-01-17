@@ -12,6 +12,10 @@
          <path>./agents/randomagent-1.0-SNAPSHOT.jar</path>
          <classname>at.pwd.randomagent.MancalaRandomAgent</classname>
       </agent>
+      <agent>
+         <path>F:\Projekte\twoforoneagent\build\libs\twoforoneagent-1.0-SNAPSHOT.jar</path>
+         <classname>at.pwd.twoforoneagent.TwoForOneAgent</classname>
+      </agent>
    </agents>
    <computation-time>10</computation-time>
    <stones-per-slot>6</stones-per-slot>
