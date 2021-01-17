@@ -6,7 +6,7 @@
 Our agent is built upon the MCTS template provided by the lecture. We made several improvements to this template, like ensuring that every possible child node is 
 selected in the selection step.
 
-We also implemented to Heuristics to improve playing performance of our agent. The first heuristic gives turns that end in the players mancala a higher value, because
+We also implemented two heuristics to improve playing performance of our agent. The first heuristic gives turns that end in the players mancala a higher value, because
 these turns are generally preferable. The second heuristic improves the playout phase of MCTS. Instead of relying on random playout we are using a system that gives
 actions a value, based on a heuristic evaluation. This is considering several factors, like if the action ends in a player's own mancala or how many stones are moved. 
 
