@@ -15,3 +15,5 @@ book is only used when our agent is starting the game. It tells the agent which 
 on the other hand is only used in the playout step, as it helps to determine early which player is going to win a round. Thus it improves playout performance by a lot.
 
 Technical Note: Sometimes the agent times out. This happened in less than 10% of games in our testing. We suspect it's the same bug that is mentioned in the course forum, as the default MCTS client is also timing out quite a lot in testing and we couldn't find any other reason for those timeouts.
+
+Load the client into the Mancala Engine with selecting the JAR and classpath + classname: "at.pwd.twoforoneagent.TwoForOneAgent"
