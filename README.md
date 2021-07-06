@@ -1,8 +1,5 @@
 ### TwoForOneAgent
 
-* Tobias Jakob
-* Nikolaus Stratil-Sauer
-
 This is an agent for this mancala engine: https://github.com/metzzo/mancala. Load the client into the engine by selecting the JAR and entering the classpath + classname: "at.pwd.twoforoneagent.TwoForOneAgent"
 
 Our agent is built upon the MCTS template provided by the engine. We made several improvements to this template, like ensuring that every possible child node is 
